@@ -8,11 +8,6 @@ class Character:
         self.x = x
         self.y = y
 
-    def draw(self):
-        pygame.draw.rect(self.screen, "blue", (self.x, self.y, 20, 20))
-        pygame.draw.circle(self.screen, "red", (self.x + 5, self.y + 5), 3)
-        pygame.draw.circle(self.screen, "red", (self.x + 15, self.y + 5), 3)
-
 
 # This function is called when you run this file, and is used to test the Character class individually.
 # When you create more files with different classes, copy the code below, then
