@@ -1,16 +1,74 @@
-import pygame
+import os
 import sys
+import pygame
 import my_character
 import upgrade_module
 
 
-def main():
-    # turn on pygame
-    pygame.init()
+def show_start_screen(screen):
+    pygame.display.set_caption("Start Screen")
 
-    # create a screen
+    base_dir = os.path.join(os.path.dirname(__file__), "images")
+    bg1_path = os.path.join(base_dir, "background 1.png")
+    bg2_path = os.path.join(base_dir, "background 2.png")
+    start_btn_path = os.path.join(base_dir, "start button.png")
+
+    bg1 = None
+    bg2 = None
+    start_btn = None
+
+    if os.path.exists(bg1_path) and os.path.exists(bg2_path) and os.path.exists(start_btn_path):
+        bg1 = pygame.image.load(bg1_path).convert()
+        bg2 = pygame.image.load(bg2_path).convert()
+        start_btn = pygame.image.load(start_btn_path).convert_alpha()
+
+    font = pygame.font.SysFont(None, 48)
+    button_font = pygame.font.SysFont(None, 32)
+    clock = pygame.time.Clock()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if start_btn is not None:
+                    btn_rect = start_btn.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+                    if btn_rect.collidepoint(event.pos):
+                        return
+                else:
+                    button_rect = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 + 40, 200, 50)
+                    if button_rect.collidepoint(event.pos):
+                        return
+
+        if bg1 is not None and bg2 is not None and start_btn is not None:
+            bg_scaled = pygame.transform.smoothscale(bg1, screen.get_size())
+            screen.blit(bg_scaled, (0, 0))
+            btn_rect = start_btn.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+            screen.blit(start_btn, btn_rect)
+        else:
+            screen.fill((20, 30, 60))
+            title_text = font.render("My Clicker Game", True, "white")
+            screen.blit(title_text, (screen.get_width() // 2 - title_text.get_width() // 2, 80))
+
+            button_rect = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 + 40, 200, 50)
+            pygame.draw.rect(screen, (70, 180, 90), button_rect)
+            button_text = button_font.render("Start Game", True, "white")
+            screen.blit(button_text, (button_rect.x + 35, button_rect.y + 10))
+
+        pygame.display.update()
+        clock.tick(60)
+
+
+def run_game(screen):
     pygame.display.set_caption("Cool Project")
-    screen = pygame.display.set_mode((640, 480))
+
+    base_dir = os.path.join(os.path.dirname(__file__), "images")
+    bg2_path = os.path.join(base_dir, "background 2.png")
+    background = None
+    if os.path.exists(bg2_path):
+        background = pygame.image.load(bg2_path).convert()
 
     # creates a Character from the my_character.py file
     character = my_character.Character(screen, 100, 100)
@@ -33,6 +91,7 @@ def main():
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                pygame.quit()
                 sys.exit()
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -45,12 +104,12 @@ def main():
                     score += 1 + manager.get_total_effect("Click Power")
 
                 if click_button.collidepoint(mouse_pos):
-                    bought, cost, level, status = manager.buy("Click Power", score)
+                    bought, cost, _, _ = manager.buy("Click Power", score)
                     if bought:
                         score -= cost
 
                 if auto_button.collidepoint(mouse_pos):
-                    bought, cost, level, status = manager.buy("Auto Clicker", score)
+                    bought, cost, _, _ = manager.buy("Auto Clicker", score)
                     if bought:
                         score -= cost
 
@@ -59,7 +118,11 @@ def main():
             score += manager.get_total_effect("Auto Clicker")
 
         # Fill the screen with background color
-        screen.fill((255, 255, 255))
+        if background is not None:
+            bg_scaled = pygame.transform.smoothscale(background, screen.get_size())
+            screen.blit(bg_scaled, (0, 0))
+        else:
+            screen.fill((255, 255, 255))
 
         # draws the character every frame
         character.draw()
@@ -97,6 +160,13 @@ def main():
 
         # don't forget the update, otherwise nothing will show up!
         pygame.display.update()
+
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((640, 480))
+    show_start_screen(screen)
+    run_game(screen)
 
 
 main()
