@@ -21,6 +21,11 @@ class Upgrade:
         return int(self.base_cost * (self.multiplier ** level))
 
 
+def split_upgrades_into_pages(upgrades, page_size=4):
+    """Split a list of upgrade objects into pages of the requested size."""
+    return [upgrades[i:i + page_size] for i in range(0, len(upgrades), page_size)]
+
+
 class UpgradeManager:
     """Keeps track of all upgrades and their current levels."""
 
