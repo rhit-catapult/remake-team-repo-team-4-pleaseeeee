@@ -1,3 +1,4 @@
+import os
 import pygame
 import sys
 
@@ -7,10 +8,14 @@ class Character:
         self.screen = screen
         self.x = x
         self.y = y
-        self.image = pygame.image.load("brownie.png")
+        image_path = os.path.join(os.path.dirname(__file__), "brownie.png")
+        self.image = pygame.image.load(image_path)
 
     def draw(self):
         self.screen.blit(self.image, (self.x, self.y))
+
+    def get_rect(self):
+        return self.image.get_rect(topleft=(self.x, self.y))
 
 
 # This function is called when you run this file, and is used to test the Character class individually.

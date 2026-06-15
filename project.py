@@ -5,6 +5,130 @@ import my_character
 import upgrade_module
 
 
+END_SCORE = 1_000_000
+
+
+def should_trigger_end_screen(score):
+    return score >= END_SCORE
+
+
+def build_upgrade_state():
+    manager = upgrade_module.UpgradeManager()
+    manager.add_upgrade(upgrade_module.Upgrade("Click Power", 10, "Adds 1 point per click", effect=1))
+    manager.add_upgrade(upgrade_module.Upgrade("Chef Boost", 100, "Adds 10 points per click", effect=10))
+    manager.add_upgrade(upgrade_module.Upgrade("City Expansion", 1000, "Adds 100 points per second", effect=100))
+    manager.add_upgrade(upgrade_module.Upgrade("Factory Line", 10000, "Adds 1000 points per second", effect=1000))
+    manager.add_upgrade(upgrade_module.Upgrade("Kitchen Crew", 120, "Adds 10 points per second", effect=10))
+    manager.add_upgrade(upgrade_module.Upgrade("Town Buzz", 1200, "Adds 100 points per click", effect=100))
+    manager.add_upgrade(upgrade_module.Upgrade("Mega Oven", 15000, "Adds 1000 points per click", effect=1000))
+    manager.add_upgrade(upgrade_module.Upgrade("Sweet Spark", 20, "Adds 1 point per second", effect=1))
+
+    upgrade_names = [
+        "Click Power",
+        "Chef Boost",
+        "City Expansion",
+        "Factory Line",
+        "Kitchen Crew",
+        "Town Buzz",
+        "Mega Oven",
+        "Sweet Spark",
+    ]
+    upgrade_button_positions = [
+        pygame.Rect(35, 125, 260, 80),
+        pygame.Rect(345, 125, 260, 80),
+        pygame.Rect(35, 215, 260, 80),
+        pygame.Rect(345, 215, 260, 80),
+    ]
+    upgrade_colors = [
+        (255, 214, 102),
+        (255, 170, 110),
+        (120, 180, 255),
+        (120, 220, 140),
+        (255, 140, 120),
+        (176, 224, 230),
+        (255, 215, 0),
+        (255, 192, 203),
+    ]
+    upgrade_pages = upgrade_module.split_upgrades_into_pages([manager.upgrades[name] for name in upgrade_names], page_size=4)
+    return manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages
+
+
+def draw_text_with_shadow(screen, font, text, pos, color, shadow_color=(0, 0, 0), offset=(1, 1)):
+    shadow_surface = font.render(text, True, shadow_color)
+    screen.blit(shadow_surface, (pos[0] + offset[0], pos[1] + offset[1]))
+    main_surface = font.render(text, True, color)
+    screen.blit(main_surface, pos)
+
+
+def draw_button(screen, rect, color, text, font, text_color, shadow_color=(0, 0, 0), radius=16):
+    shadow_rect = rect.move(3, 3)
+    pygame.draw.rect(screen, (70, 70, 70), shadow_rect, border_radius=radius)
+    pygame.draw.rect(screen, color, rect, border_radius=radius)
+
+    text_surface = font.render(text, True, text_color)
+    text_x = rect.x + (rect.width - text_surface.get_width()) // 2
+    text_y = rect.y + (rect.height - text_surface.get_height()) // 2
+    draw_text_with_shadow(screen, font, text, (text_x, text_y), text_color, shadow_color=shadow_color)
+
+
+def draw_wrapped_text(screen, font, text, pos, color, max_width, line_height=18, center=False):
+    words = text.split()
+    if not words:
+        return
+
+    lines = []
+    current_line = words[0]
+    for word in words[1:]:
+        candidate = f"{current_line} {word}"
+        if font.size(candidate)[0] <= max_width:
+            current_line = candidate
+        else:
+            lines.append(current_line)
+            current_line = word
+    lines.append(current_line)
+
+    for index, line in enumerate(lines):
+        line_surface = font.render(line, True, color)
+        x = pos[0] + (max_width - line_surface.get_width()) // 2 if center else pos[0]
+        y = pos[1] + index * line_height
+        screen.blit(line_surface, (x, y))
+
+
+def draw_upgrade_button(screen, rect, color, title, cost, description, title_font, desc_font, text_color):
+    shadow_rect = rect.move(3, 3)
+    pygame.draw.rect(screen, (70, 70, 70), shadow_rect, border_radius=16)
+    pygame.draw.rect(screen, color, rect, border_radius=16)
+
+    title_y = rect.y + 8
+    cost_y = rect.y + 32
+    desc_y = rect.y + 54
+
+    draw_wrapped_text(screen, title_font, title, (rect.x + 8, title_y), text_color, rect.width - 16, line_height=18, center=True)
+    draw_wrapped_text(screen, desc_font, f"Cost: {cost}", (rect.x + 8, cost_y), text_color, rect.width - 16, line_height=16, center=True)
+    draw_wrapped_text(screen, desc_font, description, (rect.x + 8, desc_y), text_color, rect.width - 16, line_height=14, center=True)
+
+
+def draw_end_screen(screen, end_title):
+    if end_title is not None:
+        scaled_end_title = pygame.transform.smoothscale(end_title, (420, 220))
+        title_rect = scaled_end_title.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 - 20))
+        screen.blit(scaled_end_title, title_rect)
+
+    message_font = pygame.font.SysFont("comicsansms", 24)
+    message = message_font.render("Click to play again", True, "white")
+    message_rect = message.get_rect(center=(screen.get_width() // 2, screen.get_height() - 60))
+    screen.blit(message, message_rect)
+
+
+def draw_goal_banner(screen, font):
+    goal_text = "Your goal is to reach a score of one million."
+    text_surface = font.render(goal_text, True, "#fff8e1")
+    panel = pygame.Surface((text_surface.get_width() + 24, text_surface.get_height() + 12), pygame.SRCALPHA)
+    panel.fill((40, 40, 40, 180))
+    screen.blit(panel, (16, 72))
+    screen.blit(text_surface, (28, 78))
+
+
 def show_start_screen(screen):
     pygame.display.set_caption("Start Screen")
 
@@ -22,8 +146,8 @@ def show_start_screen(screen):
         bg2 = pygame.image.load(bg2_path).convert()
         start_btn = pygame.image.load(start_btn_path).convert_alpha()
 
-    font = pygame.font.SysFont(None, 48)
-    button_font = pygame.font.SysFont(None, 32)
+    font = pygame.font.SysFont("comicsansms", 56)
+    button_font = pygame.font.SysFont("comicsansms", 28)
     clock = pygame.time.Clock()
 
     while True:
@@ -33,29 +157,23 @@ def show_start_screen(screen):
                 sys.exit()
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if start_btn is not None:
-                    btn_rect = start_btn.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
-                    if btn_rect.collidepoint(event.pos):
-                        return
-                else:
-                    button_rect = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 + 40, 200, 50)
-                    if button_rect.collidepoint(event.pos):
-                        return
+                button_rect = pygame.Rect(screen.get_width() // 2 - 115, screen.get_height() // 2 + 60, 230, 60)
+                if button_rect.collidepoint(event.pos):
+                    return
 
-        if bg1 is not None and bg2 is not None and start_btn is not None:
+        if bg1 is not None and bg2 is not None:
             bg_scaled = pygame.transform.smoothscale(bg1, screen.get_size())
             screen.blit(bg_scaled, (0, 0))
-            btn_rect = start_btn.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
-            screen.blit(start_btn, btn_rect)
         else:
             screen.fill((20, 30, 60))
-            title_text = font.render("My Clicker Game", True, "white")
-            screen.blit(title_text, (screen.get_width() // 2 - title_text.get_width() // 2, 80))
 
-            button_rect = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 + 40, 200, 50)
-            pygame.draw.rect(screen, (70, 180, 90), button_rect)
-            button_text = button_font.render("Start Game", True, "white")
-            screen.blit(button_text, (button_rect.x + 35, button_rect.y + 10))
+        title_text = font.render("My Clicker Game", True, "black")
+        title_x = (screen.get_width() - title_text.get_width()) // 2
+        title_y = (screen.get_height() - title_text.get_height()) // 2 - 40
+        screen.blit(title_text, (title_x, title_y))
+
+        button_rect = pygame.Rect(screen.get_width() // 2 - 115, screen.get_height() // 2 + 60, 230, 60)
+        draw_button(screen, button_rect, (220, 70, 70), "Start Game", button_font, "white")
 
         pygame.display.update()
         clock.tick(60)
@@ -70,23 +188,31 @@ def run_game(screen):
     if os.path.exists(bg2_path):
         background = pygame.image.load(bg2_path).convert()
 
-    # creates a Character from the my_character.py file
-    character = my_character.Character(screen, 100, 100)
+    end_title_path = os.path.join(os.path.dirname(__file__), "end title.png")
+    end_title = None
+    if os.path.exists(end_title_path):
+        end_title = pygame.image.load(end_title_path).convert_alpha()
 
-    # set up the upgrade system
-    manager = upgrade_module.UpgradeManager()
-    manager.add_upgrade(upgrade_module.Upgrade("Click Power", 10, "Adds 1 point per click", effect=1))
-    manager.add_upgrade(upgrade_module.Upgrade("Auto Clicker", 50, "Adds 1 point per second", effect=1))
+    environment_images = {}
+    for name in ["chef", "city", "factory"]:
+        image_path = os.path.join(os.path.dirname(__file__), f"{name}.png")
+        if os.path.exists(image_path):
+            environment_images[name] = pygame.image.load(image_path).convert_alpha()
+
+    character = my_character.Character(screen, 220, 140)
+
+    manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages = build_upgrade_state()
+    current_page = 0
 
     score = 0
     frame_count = 0
-    font = pygame.font.SysFont(None, 28)
-    button_font = pygame.font.SysFont(None, 24)
-
-    # let's set the framerate
+    font = pygame.font.SysFont("comicsansms", 28)
+    button_font = pygame.font.SysFont("comicsansms", 24)
     clock = pygame.time.Clock()
+    screen_mode = "play"
+
     while True:
-        clock.tick(60)  # this sets the framerate of your game
+        clock.tick(60)
         frame_count += 1
 
         for event in pygame.event.get():
@@ -96,69 +222,152 @@ def run_game(screen):
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
-                character_rect = pygame.Rect(character.x, character.y, 20, 20)
-                click_button = pygame.Rect(40, 360, 220, 40)
-                auto_button = pygame.Rect(280, 360, 220, 40)
 
-                if character_rect.collidepoint(mouse_pos):
-                    score += 1 + manager.get_total_effect("Click Power")
+                if screen_mode == "play":
+                    character_rect = character.get_rect()
+                    upgrades_button = pygame.Rect(470, 20, 140, 40)
 
-                if click_button.collidepoint(mouse_pos):
-                    bought, cost, _, _ = manager.buy("Click Power", score)
-                    if bought:
-                        score -= cost
+                    if character_rect.collidepoint(mouse_pos):
+                        click_bonus = 1 + manager.get_total_effect("Click Power") + manager.get_total_effect("Lucky Charm")
+                        score += click_bonus
 
-                if auto_button.collidepoint(mouse_pos):
-                    bought, cost, _, _ = manager.buy("Auto Clicker", score)
-                    if bought:
-                        score -= cost
+                    if upgrades_button.collidepoint(mouse_pos):
+                        screen_mode = "upgrades"
 
-        # Passive income from Auto Clicker upgrades
-        if frame_count % 60 == 0:
-            score += manager.get_total_effect("Auto Clicker")
+                elif screen_mode == "upgrades":
+                    back_button = pygame.Rect(20, 16, 110, 38)
+                    prev_page_button = pygame.Rect(150, 420, 100, 34)
+                    next_page_button = pygame.Rect(390, 420, 100, 34)
 
-        # Fill the screen with background color
+                    if back_button.collidepoint(mouse_pos):
+                        screen_mode = "play"
+
+                    if prev_page_button.collidepoint(mouse_pos) and current_page > 0:
+                        current_page -= 1
+
+                    if next_page_button.collidepoint(mouse_pos) and current_page < len(upgrade_pages) - 1:
+                        current_page += 1
+
+                    for index, upgrade in enumerate(upgrade_pages[current_page]):
+                        if upgrade_button_positions[index].collidepoint(mouse_pos):
+                            bought, cost, _, _ = manager.buy(upgrade.name, score)
+                            if bought:
+                                score -= cost
+
+                elif screen_mode == "end":
+                    manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages = build_upgrade_state()
+                    current_page = 0
+                    score = 0
+                    frame_count = 0
+                    screen_mode = "play"
+
+        if screen_mode == "play" and frame_count % 60 == 0:
+            auto_bonus = manager.get_total_effect("Auto Clicker") + manager.get_total_effect("Double Chocolate")
+            score += auto_bonus
+
+        if screen_mode == "play" and should_trigger_end_screen(score):
+            screen_mode = "end"
+
         if background is not None:
             bg_scaled = pygame.transform.smoothscale(background, screen.get_size())
             screen.blit(bg_scaled, (0, 0))
         else:
             screen.fill((255, 255, 255))
 
-        # draws the character every frame
-        character.draw()
+        if screen_mode == "play":
+            character.draw()
 
-        # draw score
-        score_text = font.render(f"Score: {score}", True, "black")
-        screen.blit(score_text, (20, 20))
+            if "chef" in environment_images:
+                chef_image = pygame.transform.smoothscale(environment_images["chef"], (92, 92))
+                screen.blit(chef_image, (38, 300))
+            if "city" in environment_images:
+                city_image = pygame.transform.smoothscale(environment_images["city"], (120, 92))
+                screen.blit(city_image, (470, 285))
+            if "factory" in environment_images:
+                factory_image = pygame.transform.smoothscale(environment_images["factory"], (116, 92))
+                screen.blit(factory_image, (34, 120))
 
-        # draw upgrade buttons
-        click_status = manager.get_status("Click Power")
-        auto_status = manager.get_status("Auto Clicker")
+            score_text = font.render(f"Score: {score}", True, "#fff8e1")
+            score_panel = pygame.Surface((score_text.get_width() + 24, score_text.get_height() + 12), pygame.SRCALPHA)
+            score_panel.fill((40, 40, 40, 160))
+            score_x = 20
+            score_y = 16
+            screen.blit(score_panel, (score_x, score_y))
+            draw_text_with_shadow(screen, font, f"Score: {score}", (score_x + 12, score_y + 6), "#fff8e1")
+            draw_goal_banner(screen, button_font)
 
-        pygame.draw.rect(screen, (220, 220, 220), (40, 360, 220, 40))
-        pygame.draw.rect(screen, (220, 220, 220), (280, 360, 220, 40))
+            upgrades_button = pygame.Rect(450, 16, 170, 46)
+            draw_button(screen, upgrades_button, (92, 184, 92), "Upgrades", button_font, "white")
 
-        click_button_text = button_font.render(
-            f"{click_status['name']} ({click_status['cost']})",
-            True,
-            "black",
-        )
-        auto_button_text = button_font.render(
-            f"{auto_status['name']} ({auto_status['cost']})",
-            True,
-            "black",
-        )
-        screen.blit(click_button_text, (50, 370))
-        screen.blit(auto_button_text, (290, 370))
+        elif screen_mode == "upgrades":
+            header_text = font.render("Upgrades", True, "#3a220c")
+            header_width = header_text.get_width() + 32
+            header_height = header_text.get_height() + 14
+            header_panel = pygame.Surface((header_width, header_height), pygame.SRCALPHA)
+            header_panel.fill((255, 247, 224, 170))
+            header_x = (screen.get_width() - header_width) // 2
+            header_y = 2
+            screen.blit(header_panel, (header_x, header_y))
+            draw_text_with_shadow(
+                screen,
+                font,
+                "Upgrades",
+                (header_x + 16, header_y + 4),
+                "#3a220c",
+            )
 
-        level_text = button_font.render(
-            f"Click Lv: {click_status['level']}   Auto Lv: {auto_status['level']}",
-            True,
-            "black",
-        )
-        screen.blit(level_text, (20, 320))
+            back_button = pygame.Rect(20, 16, 110, 40)
+            draw_button(screen, back_button, (225, 225, 225), "Back", button_font, "#3a220c")
 
-        # don't forget the update, otherwise nothing will show up!
+            click_status = manager.get_status("Click Power")
+            auto_status = manager.get_status("Auto Clicker")
+
+            draw_goal_banner(screen, button_font)
+
+            level_text = button_font.render(
+                f"Click Income: {1 + click_status['level']}   Auto Income: {auto_status['level']}",
+                True,
+                "#3a220c",
+            )
+            level_width = level_text.get_width() + 28
+            level_height = level_text.get_height() + 12
+            level_panel = pygame.Surface((level_width, level_height), pygame.SRCALPHA)
+            level_panel.fill((255, 247, 224, 170))
+            level_x = (screen.get_width() - level_width) // 2
+            level_y = 56
+            screen.blit(level_panel, (level_x, level_y))
+            draw_text_with_shadow(
+                screen,
+                button_font,
+                f"Click Income: {1 + click_status['level']}   Auto Income: {auto_status['level']}",
+                (level_x + 14, level_y + 4),
+                "#3a220c",
+            )
+
+            for index, upgrade in enumerate(upgrade_pages[current_page]):
+                status = manager.get_status(upgrade.name)
+                rect = upgrade_button_positions[index]
+                draw_upgrade_button(
+                    screen,
+                    rect,
+                    upgrade_colors[index],
+                    status['name'],
+                    status['cost'],
+                    status['description'],
+                    pygame.font.SysFont("comicsansms", 16),
+                    pygame.font.SysFont("comicsansms", 12),
+                    "#3a220c",
+                )
+
+            draw_button(screen, pygame.Rect(150, 420, 100, 32), (220, 220, 220), "Prev", button_font, "#3a220c")
+            draw_button(screen, pygame.Rect(390, 420, 100, 32), (220, 220, 220), "Next", button_font, "#3a220c")
+
+            page_text = button_font.render(f"Page {current_page + 1}/{len(upgrade_pages)}", True, "#3a220c")
+            screen.blit(page_text, (270, 426))
+
+        else:
+            draw_end_screen(screen, end_title)
+
         pygame.display.update()
 
 
@@ -169,4 +378,5 @@ def main():
     run_game(screen)
 
 
-main()
+if __name__ == "__main__":
+    main()
