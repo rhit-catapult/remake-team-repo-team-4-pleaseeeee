@@ -71,6 +71,8 @@ class UpgradeManager:
 
     def get_total_effect(self, name):
         """Return the current total effect of one upgrade type."""
+        if name not in self.upgrades:
+            return 0
         upgrade = self.upgrades[name]
         return self.levels[name] * upgrade.effect
 

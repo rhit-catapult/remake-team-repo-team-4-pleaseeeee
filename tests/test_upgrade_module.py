@@ -16,6 +16,7 @@ def test_manager_supports_multiple_upgrades():
     assert len(manager.get_all_status()) == 3
     assert manager.get_status("Lucky Charm")["level"] == 0
     assert manager.get_total_effect("Lucky Charm") == 0
+    assert manager.get_total_effect("Nonexistent Upgrade") == 0
 
 
 def test_upgrades_split_into_pages():

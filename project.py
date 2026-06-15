@@ -15,23 +15,29 @@ def should_trigger_end_screen(score):
 def build_upgrade_state():
     manager = upgrade_module.UpgradeManager()
     manager.add_upgrade(upgrade_module.Upgrade("Click Power", 10, "Adds 1 point per click", effect=1))
+    manager.add_upgrade(upgrade_module.Upgrade("Sweet Spark", 40, "Adds 1 point per second", effect=1))
+    manager.add_upgrade(upgrade_module.Upgrade("Auto Clicker", 50, "Adds 1 point per second", effect=1))
+    manager.add_upgrade(upgrade_module.Upgrade("Lucky Charm", 80, "Adds 2 points per click", effect=2))
     manager.add_upgrade(upgrade_module.Upgrade("Chef Boost", 100, "Adds 10 points per click", effect=10))
+    manager.add_upgrade(upgrade_module.Upgrade("Kitchen Crew", 120, "Adds 10 points per second", effect=10))
+    manager.add_upgrade(upgrade_module.Upgrade("Double Chocolate", 2500, "Adds 20 points per second", effect=20))
+    manager.add_upgrade(upgrade_module.Upgrade("Town Buzz", 1200, "Adds 100 points per click", effect=100))
     manager.add_upgrade(upgrade_module.Upgrade("City Expansion", 1000, "Adds 100 points per second", effect=100))
     manager.add_upgrade(upgrade_module.Upgrade("Factory Line", 10000, "Adds 1000 points per second", effect=1000))
-    manager.add_upgrade(upgrade_module.Upgrade("Kitchen Crew", 120, "Adds 10 points per second", effect=10))
-    manager.add_upgrade(upgrade_module.Upgrade("Town Buzz", 1200, "Adds 100 points per click", effect=100))
     manager.add_upgrade(upgrade_module.Upgrade("Mega Oven", 15000, "Adds 1000 points per click", effect=1000))
-    manager.add_upgrade(upgrade_module.Upgrade("Sweet Spark", 20, "Adds 1 point per second", effect=1))
 
     upgrade_names = [
         "Click Power",
+        "Sweet Spark",
+        "Auto Clicker",
+        "Lucky Charm",
         "Chef Boost",
+        "Kitchen Crew",
+        "Double Chocolate",
+        "Town Buzz",
         "City Expansion",
         "Factory Line",
-        "Kitchen Crew",
-        "Town Buzz",
         "Mega Oven",
-        "Sweet Spark",
     ]
     upgrade_button_positions = [
         pygame.Rect(35, 125, 260, 80),
@@ -94,17 +100,20 @@ def draw_wrapped_text(screen, font, text, pos, color, max_width, line_height=18,
         screen.blit(line_surface, (x, y))
 
 
-def draw_upgrade_button(screen, rect, color, title, cost, description, title_font, desc_font, text_color):
+def draw_upgrade_button(screen, rect, color, title, cost, description, title_font, desc_font, text_color, affordable=True):
     shadow_rect = rect.move(3, 3)
     pygame.draw.rect(screen, (70, 70, 70), shadow_rect, border_radius=16)
-    pygame.draw.rect(screen, color, rect, border_radius=16)
+
+    button_color = color if affordable else tuple(max(0, c - 80) for c in color)
+    pygame.draw.rect(screen, button_color, rect, border_radius=16)
 
     title_y = rect.y + 8
     cost_y = rect.y + 32
     desc_y = rect.y + 54
 
     draw_wrapped_text(screen, title_font, title, (rect.x + 8, title_y), text_color, rect.width - 16, line_height=18, center=True)
-    draw_wrapped_text(screen, desc_font, f"Cost: {cost}", (rect.x + 8, cost_y), text_color, rect.width - 16, line_height=16, center=True)
+    cost_color = "#8fbc8f" if affordable else "#e07b7b"
+    draw_wrapped_text(screen, desc_font, f"Cost: {cost}", (rect.x + 8, cost_y), cost_color, rect.width - 16, line_height=16, center=True)
     draw_wrapped_text(screen, desc_font, description, (rect.x + 8, desc_y), text_color, rect.width - 16, line_height=14, center=True)
 
 
@@ -129,8 +138,15 @@ def draw_goal_banner(screen, font):
     screen.blit(text_surface, (28, 78))
 
 
+def get_upgrade_effect(manager, name):
+    try:
+        return manager.get_total_effect(name)
+    except KeyError:
+        return 0
+
+
 def show_start_screen(screen):
-    pygame.display.set_caption("Start Screen")
+    pygame.display.set_caption("Brownie Clicker")
 
     base_dir = os.path.join(os.path.dirname(__file__), "images")
     bg1_path = os.path.join(base_dir, "background 1.png")
@@ -167,20 +183,20 @@ def show_start_screen(screen):
         else:
             screen.fill((20, 30, 60))
 
-        title_text = font.render("My Clicker Game", True, "black")
+        title_text = font.render("Brownie Clicker", True, "black")
         title_x = (screen.get_width() - title_text.get_width()) // 2
         title_y = (screen.get_height() - title_text.get_height()) // 2 - 40
         screen.blit(title_text, (title_x, title_y))
 
         button_rect = pygame.Rect(screen.get_width() // 2 - 115, screen.get_height() // 2 + 60, 230, 60)
-        draw_button(screen, button_rect, (220, 70, 70), "Start Game", button_font, "white")
+        draw_button(screen, button_rect, (220, 70, 70), "Play Brownies", button_font, "white")
 
         pygame.display.update()
         clock.tick(60)
 
 
 def run_game(screen):
-    pygame.display.set_caption("Cool Project")
+    pygame.display.set_caption("Brownie Clicker")
 
     base_dir = os.path.join(os.path.dirname(__file__), "images")
     bg2_path = os.path.join(base_dir, "background 2.png")
@@ -203,6 +219,7 @@ def run_game(screen):
 
     manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages = build_upgrade_state()
     current_page = 0
+    purchase_message = ""
 
     score = 0
     frame_count = 0
@@ -228,7 +245,7 @@ def run_game(screen):
                     upgrades_button = pygame.Rect(470, 20, 140, 40)
 
                     if character_rect.collidepoint(mouse_pos):
-                        click_bonus = 1 + manager.get_total_effect("Click Power") + manager.get_total_effect("Lucky Charm")
+                        click_bonus = 1 + get_upgrade_effect(manager, "Click Power") + get_upgrade_effect(manager, "Lucky Charm")
                         score += click_bonus
 
                     if upgrades_button.collidepoint(mouse_pos):
@@ -241,18 +258,27 @@ def run_game(screen):
 
                     if back_button.collidepoint(mouse_pos):
                         screen_mode = "play"
+                        purchase_message = ""
 
                     if prev_page_button.collidepoint(mouse_pos) and current_page > 0:
                         current_page -= 1
+                        purchase_message = ""
 
                     if next_page_button.collidepoint(mouse_pos) and current_page < len(upgrade_pages) - 1:
                         current_page += 1
+                        purchase_message = ""
 
                     for index, upgrade in enumerate(upgrade_pages[current_page]):
+                        if index >= len(upgrade_button_positions):
+                            continue
+
                         if upgrade_button_positions[index].collidepoint(mouse_pos):
-                            bought, cost, _, _ = manager.buy(upgrade.name, score)
+                            bought, cost, _, status = manager.buy(upgrade.name, score)
                             if bought:
                                 score -= cost
+                                purchase_message = f"Bought {status['name']}!"
+                            else:
+                                purchase_message = f"Need {cost} points for {status['name']}"
 
                 elif screen_mode == "end":
                     manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages = build_upgrade_state()
@@ -262,7 +288,7 @@ def run_game(screen):
                     screen_mode = "play"
 
         if screen_mode == "play" and frame_count % 60 == 0:
-            auto_bonus = manager.get_total_effect("Auto Clicker") + manager.get_total_effect("Double Chocolate")
+            auto_bonus = get_upgrade_effect(manager, "Auto Clicker") + get_upgrade_effect(manager, "Double Chocolate")
             score += auto_bonus
 
         if screen_mode == "play" and should_trigger_end_screen(score):
@@ -276,16 +302,6 @@ def run_game(screen):
 
         if screen_mode == "play":
             character.draw()
-
-            if "chef" in environment_images:
-                chef_image = pygame.transform.smoothscale(environment_images["chef"], (92, 92))
-                screen.blit(chef_image, (38, 300))
-            if "city" in environment_images:
-                city_image = pygame.transform.smoothscale(environment_images["city"], (120, 92))
-                screen.blit(city_image, (470, 285))
-            if "factory" in environment_images:
-                factory_image = pygame.transform.smoothscale(environment_images["factory"], (116, 92))
-                screen.blit(factory_image, (34, 120))
 
             score_text = font.render(f"Score: {score}", True, "#fff8e1")
             score_panel = pygame.Surface((score_text.get_width() + 24, score_text.get_height() + 12), pygame.SRCALPHA)
@@ -322,7 +338,20 @@ def run_game(screen):
             click_status = manager.get_status("Click Power")
             auto_status = manager.get_status("Auto Clicker")
 
-            draw_goal_banner(screen, button_font)
+            image_x = screen.get_width() - 128
+            image_y = screen.get_height() - 130
+
+            if current_page == 0 and "chef" in environment_images:
+                chef_image = pygame.transform.smoothscale(environment_images["chef"], (92, 92))
+                screen.blit(chef_image, (image_x, image_y))
+            elif current_page == 1 and "factory" in environment_images:
+                factory_image = pygame.transform.smoothscale(environment_images["factory"], (124, 100))
+                screen.blit(factory_image, (image_x, image_y))
+            elif current_page == 2 and "city" in environment_images:
+                city_image = pygame.transform.smoothscale(environment_images["city"], (120, 92))
+                screen.blit(city_image, (image_x, image_y))
+
+            # 升级页面不显示目标横幅
 
             level_text = button_font.render(
                 f"Click Income: {1 + click_status['level']}   Auto Income: {auto_status['level']}",
@@ -347,16 +376,19 @@ def run_game(screen):
             for index, upgrade in enumerate(upgrade_pages[current_page]):
                 status = manager.get_status(upgrade.name)
                 rect = upgrade_button_positions[index]
+                button_color = upgrade_colors[index] if index < len(upgrade_colors) else (200, 200, 200)
+                can_afford = score >= status['cost']
                 draw_upgrade_button(
                     screen,
                     rect,
-                    upgrade_colors[index],
+                    button_color,
                     status['name'],
                     status['cost'],
                     status['description'],
                     pygame.font.SysFont("comicsansms", 16),
                     pygame.font.SysFont("comicsansms", 12),
                     "#3a220c",
+                    affordable=can_afford,
                 )
 
             draw_button(screen, pygame.Rect(150, 420, 100, 32), (220, 220, 220), "Prev", button_font, "#3a220c")
@@ -364,6 +396,9 @@ def run_game(screen):
 
             page_text = button_font.render(f"Page {current_page + 1}/{len(upgrade_pages)}", True, "#3a220c")
             screen.blit(page_text, (270, 426))
+
+            if purchase_message:
+                draw_text_with_shadow(screen, button_font, purchase_message, (20, 370), "#3a220c")
 
         else:
             draw_end_screen(screen, end_title)
