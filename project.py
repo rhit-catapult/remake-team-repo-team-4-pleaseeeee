@@ -7,6 +7,22 @@ import upgrade_module
 
 END_SCORE = 1_000_000
 
+CLICK_UPGRADES = (
+    "Click Power",
+    "Lucky Charm",
+    "Chef Boost",
+    "Town Buzz",
+    "Mega Oven",
+)
+AUTO_UPGRADES = (
+    "Sweet Spark",
+    "Auto Clicker",
+    "Kitchen Crew",
+    "City Expansion",
+    "Double Chocolate",
+    "Factory Line",
+)
+
 
 def should_trigger_end_screen(score):
     return score >= END_SCORE
@@ -145,6 +161,14 @@ def get_upgrade_effect(manager, name):
         return 0
 
 
+def get_click_bonus(manager):
+    return sum(get_upgrade_effect(manager, name) for name in CLICK_UPGRADES)
+
+
+def get_auto_bonus(manager):
+    return sum(get_upgrade_effect(manager, name) for name in AUTO_UPGRADES)
+
+
 def show_start_screen(screen):
     pygame.display.set_caption("Brownie Clicker")
 
@@ -245,7 +269,7 @@ def run_game(screen):
                     upgrades_button = pygame.Rect(470, 20, 140, 40)
 
                     if character_rect.collidepoint(mouse_pos):
-                        click_bonus = 1 + get_upgrade_effect(manager, "Click Power") + get_upgrade_effect(manager, "Lucky Charm")
+                        click_bonus = 1 + get_click_bonus(manager)
                         score += click_bonus
 
                     if upgrades_button.collidepoint(mouse_pos):
@@ -288,7 +312,7 @@ def run_game(screen):
                     screen_mode = "play"
 
         if screen_mode == "play" and frame_count % 60 == 0:
-            auto_bonus = get_upgrade_effect(manager, "Auto Clicker") + get_upgrade_effect(manager, "Double Chocolate")
+            auto_bonus = get_auto_bonus(manager)
             score += auto_bonus
 
         if screen_mode == "play" and should_trigger_end_screen(score):
@@ -335,8 +359,8 @@ def run_game(screen):
             back_button = pygame.Rect(20, 16, 110, 40)
             draw_button(screen, back_button, (225, 225, 225), "Back", button_font, "#3a220c")
 
-            click_status = manager.get_status("Click Power")
-            auto_status = manager.get_status("Auto Clicker")
+            click_income = 1 + get_click_bonus(manager)
+            auto_income = get_auto_bonus(manager)
 
             image_x = screen.get_width() - 128
             image_y = screen.get_height() - 130
@@ -353,8 +377,10 @@ def run_game(screen):
 
             # 升级页面不显示目标横幅
 
+            click_income = 1 + get_click_bonus(manager)
+            auto_income = get_auto_bonus(manager)
             level_text = button_font.render(
-                f"Click Income: {1 + click_status['level']}   Auto Income: {auto_status['level']}",
+                f"Click Income: {click_income}   Auto Income: {auto_income}",
                 True,
                 "#3a220c",
             )
@@ -368,7 +394,7 @@ def run_game(screen):
             draw_text_with_shadow(
                 screen,
                 button_font,
-                f"Click Income: {1 + click_status['level']}   Auto Income: {auto_status['level']}",
+                f"Click Income: {click_income}   Auto Income: {auto_income}",
                 (level_x + 14, level_y + 4),
                 "#3a220c",
             )
