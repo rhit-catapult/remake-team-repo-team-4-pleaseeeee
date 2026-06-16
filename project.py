@@ -189,7 +189,7 @@ def draw_end_screen(screen, end_title, time_seconds=0):
 
     message_font = pygame.font.SysFont("comicsansms", 24)
     
-    # Display time taken
+    
     minutes = time_seconds // 60
     seconds = time_seconds % 60
     time_text = message_font.render(f"Time: {minutes}m {seconds}s", True, "white")
@@ -258,7 +258,7 @@ def show_start_screen(screen):
                 if button_rect.collidepoint(event.pos):
                     return
                 
-                # Reset leaderboard button
+                
                 reset_button_rect = pygame.Rect(screen.get_width() - 150, 10, 140, 40)
                 if reset_button_rect.collidepoint(event.pos):
                     reset_leaderboard()
@@ -277,7 +277,7 @@ def show_start_screen(screen):
         button_rect = pygame.Rect(screen.get_width() // 2 - 115, screen.get_height() // 2 + 60, 230, 60)
         draw_button(screen, button_rect, (220, 70, 70), "Play Brownies", button_font, "white")
 
-        # Display leaderboard
+        
         leaderboard = load_leaderboard()
         if leaderboard:
             leaderboard_title = leaderboard_font.render("Top Times:", True, "white")
@@ -290,7 +290,7 @@ def show_start_screen(screen):
                 leaderboard_text = leaderboard_font.render(time_text, True, "white")
                 screen.blit(leaderboard_text, (20, 50 + idx * 25))
         
-        # Reset leaderboard button
+        
         reset_button_rect = pygame.Rect(screen.get_width() - 150, 10, 140, 40)
         draw_button(screen, reset_button_rect, (200, 100, 100), "Reset Times", button_font, "white")
 
@@ -339,7 +339,7 @@ def run_game(screen):
 
     character = my_character.Character(screen, 220, 140)
 
-    # Load brownie click sound (if available)
+    
     brownie_sound = None
     sound_path = os.path.join(os.path.dirname(__file__), "brownie.mp3")
     if os.path.exists(sound_path):
@@ -375,14 +375,14 @@ def run_game(screen):
     game_start_time = pygame.time.get_ticks() / 1000
     game_end_time = 0
     player_name = ""
-    # Scrolling setup: upgrades live below the main play area
+    
     upgrades_offset = screen.get_height()
     total_height = screen.get_height() + screen.get_height()
     max_scroll = max(0, total_height - screen.get_height())
     scroll_y = 0
-    # Track upgrade counts for icons
+    
     upgrade_counts = {"chef": 0, "factory": 0, "city": 0}
-    # Map upgrades to categories
+    
     upgrade_category_map = {
         "Chef Boost": "chef",
         "Kitchen Crew": "chef",
@@ -390,9 +390,9 @@ def run_game(screen):
         "Town Buzz": "city",
         "City Expansion": "city",
     }
-    # Sound mute tracking
+    
     mute_sound = False
-    # Fullscreen tracking
+    
     is_fullscreen = True
 
     while True:
@@ -404,11 +404,11 @@ def run_game(screen):
                 pygame.quit()
                 sys.exit()
 
-            # Mouse wheel support (pygame.MOUSEWHEEL)
+            
             if event.type == pygame.MOUSEWHEEL:
                 scroll_y = min(max(scroll_y - event.y * 40, 0), max_scroll)
 
-            # Keyboard support for name input
+            
             if event.type == pygame.KEYDOWN and screen_mode == "name_input":
                 if event.key == pygame.K_RETURN and len(player_name) > 0:
                     add_to_leaderboard(player_name, int(game_end_time))
@@ -424,7 +424,7 @@ def run_game(screen):
                 elif len(player_name) < 20 and event.unicode.isalnum() or event.unicode == " ":
                     player_name += event.unicode
 
-            # Older mouse wheel via button 4/5
+            
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 4:
                     scroll_y = min(max(scroll_y - 40, 0), max_scroll)
@@ -434,7 +434,7 @@ def run_game(screen):
                     continue
 
                 mouse_pos = pygame.mouse.get_pos()
-                # translate to canvas/world coordinates
+                
                 world_pos = (mouse_pos[0], mouse_pos[1] + scroll_y)
 
                 if screen_mode == "play":
@@ -472,14 +472,14 @@ def run_game(screen):
                             screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                         else:
                             screen = pygame.display.set_mode((1200, 700))
-                        # Update canvas dimensions
+                        
                         upgrades_offset = screen.get_height()
                         total_height = screen.get_height() + screen.get_height()
                         max_scroll = max(0, total_height - screen.get_height())
                         scroll_y = 0
 
                     if upgrades_button.collidepoint(world_pos):
-                        # toggle scroll to upgrades section
+                       
                         if scroll_y < upgrades_offset // 2:
                             scroll_y = upgrades_offset
                         else:
@@ -489,11 +489,10 @@ def run_game(screen):
                     player_name = ""
                     screen_mode = "name_input"
 
-                # Handle clicks in the upgrades area (below the play area)
-                # world_pos is defined above when processing MOUSEBUTTONDOWN
+                
                 try:
                     if world_pos[1] >= upgrades_offset:
-                        # Back button scrolls to top
+                        
                         back_button = pygame.Rect(20, 16 + upgrades_offset, 110, 40)
                         prev_page_button = pygame.Rect(150, 420 + upgrades_offset, 100, 34)
                         next_page_button = pygame.Rect(390, 420 + upgrades_offset, 100, 34)
@@ -520,14 +519,14 @@ def run_game(screen):
                                 if bought:
                                     score -= cost
                                     purchase_message = f"Bought {status['name']}!"
-                                    # Track upgrade category
+                                    
                                     if upgrade.name in upgrade_category_map:
                                         category = upgrade_category_map[upgrade.name]
                                         upgrade_counts[category] += 1
                                 else:
                                     purchase_message = f"Need {cost} brownies for {status['name']}"
                 except NameError:
-                    # world_pos may not be defined for non-MOUSEBUTTONDOWN events
+                    
                     pass
 
         if screen_mode == "play" and frame_count % 60 == 0:
@@ -543,7 +542,7 @@ def run_game(screen):
         if auto_boost_active and pygame.time.get_ticks() > auto_boost_end_time:
             auto_boost_active = False
 
-        # Draw everything to a taller canvas, then blit the visible portion
+        
         canvas = pygame.Surface((screen.get_width(), total_height))
 
         if background is not None:
@@ -552,8 +551,7 @@ def run_game(screen):
         else:
             canvas.fill((255, 255, 255))
 
-        # Play area (top of canvas)
-        # ensure character draws onto the canvas surface
+        
         character.screen = canvas
         character.draw()
 
@@ -569,20 +567,19 @@ def run_game(screen):
         upgrades_button = pygame.Rect(450, 16, 170, 46)
         draw_button(canvas, upgrades_button, (92, 184, 92), "Upgrades", button_font, "white")
 
-        # Mute button
+        
         mute_button = pygame.Rect(650, 20, 100, 38)
         mute_text = "Unmute" if mute_sound else "Mute"
         mute_color = (150, 150, 150) if mute_sound else (200, 200, 200)
         draw_button(canvas, mute_button, mute_color, mute_text, button_font, "#3a220c")
 
-        # Fullscreen button
+        
         fullscreen_button = pygame.Rect(770, 20, 130, 38)
         fullscreen_text = "Windowed" if is_fullscreen else "Fullscreen"
         fullscreen_color = (100, 180, 220)
         draw_button(canvas, fullscreen_button, fullscreen_color, fullscreen_text, button_font, "white")
 
-        # Display upgrade icons stacked vertically on the right edge,
-        # well clear of the goal banner text and far from the brownie character
+        
         icon_column_x = canvas.get_width() - 80
         icon_positions = [(icon_column_x, 110), (icon_column_x, 170), (icon_column_x, 230)]
         icon_names = ["chef", "factory", "city"]
@@ -600,7 +597,7 @@ def run_game(screen):
                 jj_dy *= -1
             canvas.blit(jj_image, jj_rect)
 
-        # Upgrades area (below play area)
+        
         base_y = upgrades_offset
 
         header_text = font.render("Upgrades", True, "#3a220c")
@@ -625,7 +622,7 @@ def run_game(screen):
         click_income = 1 + get_click_bonus(manager)
         auto_income = get_auto_bonus(manager)
 
-        # Display page-specific environment image in upgrades section
+        
         image_x = canvas.get_width() - 150
         image_y = base_y + 320
         if current_page == 0 and "chef" in environment_images:
@@ -638,7 +635,7 @@ def run_game(screen):
             city_image = pygame.transform.smoothscale(environment_images["city"], (140, 120))
             canvas.blit(city_image, (image_x, image_y))
 
-        # level panel
+        
         level_text = button_font.render(
             f"Click Income: {click_income}   Auto Income: {auto_income}",
             True,
@@ -688,7 +685,7 @@ def run_game(screen):
         if purchase_message:
             draw_text_with_shadow(canvas, button_font, purchase_message, (20, 370 + base_y), "#3a220c")
 
-        # End screen overlay if triggered
+        
         if screen_mode == "name_input":
             # Draw name input screen
             screen.blit(canvas, (0, -scroll_y))
@@ -709,11 +706,11 @@ def run_game(screen):
             instruction_text = instruction_font.render("Press ENTER to continue", True, "yellow")
             screen.blit(instruction_text, (screen.get_width() // 2 - instruction_text.get_width() // 2, screen.get_height() // 2 + 40))
         elif screen_mode == "end":
-            # show end overlay on top of visible canvas
+            
             screen.blit(canvas, (0, -scroll_y))
             draw_end_screen(screen, end_title, int(game_end_time))
         else:
-            # blit visible portion of canvas
+            
             screen.blit(canvas, (0, -scroll_y))
 
         pygame.display.update()
