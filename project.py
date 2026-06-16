@@ -116,7 +116,7 @@ def draw_wrapped_text(screen, font, text, pos, color, max_width, line_height=18,
         screen.blit(line_surface, (x, y))
 
 
-def draw_upgrade_button(screen, rect, color, title, cost, description, title_font, desc_font, text_color, affordable=True):
+def draw_upgrade_button(screen, rect, color, title, cost, description, title_font, desc_font, text_color, affordable=True, icon_image=None):
     shadow_rect = rect.move(3, 3)
     pygame.draw.rect(screen, (70, 70, 70), shadow_rect, border_radius=16)
 
@@ -126,11 +126,21 @@ def draw_upgrade_button(screen, rect, color, title, cost, description, title_fon
     title_y = rect.y + 8
     cost_y = rect.y + 32
     desc_y = rect.y + 54
+    content_x = rect.x + 8
+    content_width = rect.width - 16
 
-    draw_wrapped_text(screen, title_font, title, (rect.x + 8, title_y), text_color, rect.width - 16, line_height=18, center=True)
+    if icon_image is not None:
+        icon_size = 40
+        icon = pygame.transform.smoothscale(icon_image, (icon_size, icon_size))
+        icon_y = rect.y + (rect.height - icon_size) // 2
+        screen.blit(icon, (rect.x + 8, icon_y))
+        content_x += icon_size + 8
+        content_width -= icon_size + 8
+
+    draw_wrapped_text(screen, title_font, title, (content_x, title_y), text_color, content_width, line_height=18, center=True)
     cost_color = "#8fbc8f" if affordable else "#e07b7b"
-    draw_wrapped_text(screen, desc_font, f"Cost: {cost}", (rect.x + 8, cost_y), cost_color, rect.width - 16, line_height=16, center=True)
-    draw_wrapped_text(screen, desc_font, description, (rect.x + 8, desc_y), text_color, rect.width - 16, line_height=14, center=True)
+    draw_wrapped_text(screen, desc_font, f"Cost: {cost}", (content_x, cost_y), cost_color, content_width, line_height=16, center=True)
+    draw_wrapped_text(screen, desc_font, description, (content_x, desc_y), text_color, content_width, line_height=14, center=True)
 
 
 def draw_end_screen(screen, end_title):
@@ -239,6 +249,25 @@ def run_game(screen):
         if os.path.exists(image_path):
             environment_images[name] = pygame.image.load(image_path).convert_alpha()
 
+    upgrade_icon_images = {}
+    upgrade_icon_files = {
+        "Click Power": "clicker.png",
+        "Auto Clicker": "auto click.png",
+        "Sweet Spark": "sparkle.png",
+        "Lucky Charm": "lucky.png",
+        "Chef Boost": "double chef.png",
+        "Double Chocolate": "double cake.png",
+        "Kitchen Crew": "kitchen crew.png",
+        "Town Buzz": "town.png",
+        "City Expansion": "city expansion.png",
+        "Factory Line": "factory line.png",
+        "Mega Oven": "mega oven.png",
+    }
+    for upgrade_name, file_name in upgrade_icon_files.items():
+        image_path = os.path.join(os.path.dirname(__file__), file_name)
+        if os.path.exists(image_path):
+            upgrade_icon_images[upgrade_name] = pygame.image.load(image_path).convert_alpha()
+
     character = my_character.Character(screen, 220, 140)
 
     # Load brownie click sound (if available)
@@ -267,6 +296,20 @@ def run_game(screen):
     total_height = screen.get_height() + screen.get_height()
     max_scroll = max(0, total_height - screen.get_height())
     scroll_y = 0
+    # Track upgrade counts for icons
+    upgrade_counts = {"chef": 0, "factory": 0, "city": 0}
+    # Map upgrades to categories
+    upgrade_category_map = {
+        "Chef Boost": "chef",
+        "Kitchen Crew": "chef",
+        "Factory Line": "factory",
+        "Town Buzz": "city",
+        "City Expansion": "city",
+    }
+    # Sound mute tracking
+    mute_sound = False
+    # Fullscreen tracking
+    is_fullscreen = True
 
     while True:
         clock.tick(60)
@@ -301,11 +344,28 @@ def run_game(screen):
                     if character_rect.collidepoint(world_pos):
                         click_bonus = 1 + get_click_bonus(manager)
                         score += click_bonus
-                        if brownie_sound:
+                        if brownie_sound and not mute_sound:
                             try:
                                 brownie_sound.play()
                             except Exception:
                                 pass
+
+                    mute_button_rect = pygame.Rect(650, 20, 100, 38)
+                    if mute_button_rect.collidepoint(world_pos):
+                        mute_sound = not mute_sound
+
+                    fullscreen_button_rect = pygame.Rect(770, 20, 130, 38)
+                    if fullscreen_button_rect.collidepoint(world_pos):
+                        is_fullscreen = not is_fullscreen
+                        if is_fullscreen:
+                            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        else:
+                            screen = pygame.display.set_mode((1200, 700))
+                        # Update canvas dimensions
+                        upgrades_offset = screen.get_height()
+                        total_height = screen.get_height() + screen.get_height()
+                        max_scroll = max(0, total_height - screen.get_height())
+                        scroll_y = 0
 
                     if upgrades_button.collidepoint(world_pos):
                         # toggle scroll to upgrades section
@@ -320,6 +380,7 @@ def run_game(screen):
                     score = 0
                     frame_count = 0
                     screen_mode = "play"
+                    upgrade_counts = {"chef": 0, "factory": 0, "city": 0}
 
                 # Handle clicks in the upgrades area (below the play area)
                 # world_pos is defined above when processing MOUSEBUTTONDOWN
@@ -352,6 +413,10 @@ def run_game(screen):
                                 if bought:
                                     score -= cost
                                     purchase_message = f"Bought {status['name']}!"
+                                    # Track upgrade category
+                                    if upgrade.name in upgrade_category_map:
+                                        category = upgrade_category_map[upgrade.name]
+                                        upgrade_counts[category] += 1
                                 else:
                                     purchase_message = f"Need {cost} points for {status['name']}"
                 except NameError:
@@ -391,6 +456,29 @@ def run_game(screen):
         upgrades_button = pygame.Rect(450, 16, 170, 46)
         draw_button(canvas, upgrades_button, (92, 184, 92), "Upgrades", button_font, "white")
 
+        # Mute button
+        mute_button = pygame.Rect(650, 20, 100, 38)
+        mute_text = "Unmute" if mute_sound else "Mute"
+        mute_color = (150, 150, 150) if mute_sound else (200, 200, 200)
+        draw_button(canvas, mute_button, mute_color, mute_text, button_font, "#3a220c")
+
+        # Fullscreen button
+        fullscreen_button = pygame.Rect(770, 20, 130, 38)
+        fullscreen_text = "Windowed" if is_fullscreen else "Fullscreen"
+        fullscreen_color = (100, 180, 220)
+        draw_button(canvas, fullscreen_button, fullscreen_color, fullscreen_text, button_font, "white")
+
+        # Display upgrade icons with counts at the top right (spaced out)
+        icon_positions = [(880, 20), (970, 20), (1060, 20)]
+        icon_names = ["chef", "factory", "city"]
+        for idx, (icon_name, pos) in enumerate(zip(icon_names, icon_positions)):
+            if icon_name in environment_images:
+                icon_img = pygame.transform.smoothscale(environment_images[icon_name], (50, 50))
+                canvas.blit(icon_img, pos)
+                # Draw count
+                count_text = button_font.render(str(upgrade_counts[icon_name]), True, "#3a220c")
+                canvas.blit(count_text, (pos[0] + 55, pos[1] + 12))
+
         # Upgrades area (below play area)
         base_y = upgrades_offset
 
@@ -416,17 +504,17 @@ def run_game(screen):
         click_income = 1 + get_click_bonus(manager)
         auto_income = get_auto_bonus(manager)
 
-        image_x = canvas.get_width() - 128
-        image_y = base_y + canvas.get_height() - 130
-
+        # Display page-specific environment image in upgrades section
+        image_x = canvas.get_width() - 150
+        image_y = base_y + 320
         if current_page == 0 and "chef" in environment_images:
-            chef_image = pygame.transform.smoothscale(environment_images["chef"], (92, 92))
+            chef_image = pygame.transform.smoothscale(environment_images["chef"], (120, 120))
             canvas.blit(chef_image, (image_x, image_y))
         elif current_page == 1 and "factory" in environment_images:
-            factory_image = pygame.transform.smoothscale(environment_images["factory"], (124, 100))
+            factory_image = pygame.transform.smoothscale(environment_images["factory"], (140, 130))
             canvas.blit(factory_image, (image_x, image_y))
         elif current_page == 2 and "city" in environment_images:
-            city_image = pygame.transform.smoothscale(environment_images["city"], (120, 92))
+            city_image = pygame.transform.smoothscale(environment_images["city"], (140, 120))
             canvas.blit(city_image, (image_x, image_y))
 
         # level panel
@@ -455,6 +543,7 @@ def run_game(screen):
             rect = upgrade_button_positions[index].move(0, base_y)
             button_color = upgrade_colors[index] if index < len(upgrade_colors) else (200, 200, 200)
             can_afford = score >= status['cost']
+            icon_image = upgrade_icon_images.get(upgrade.name)
             draw_upgrade_button(
                 canvas,
                 rect,
@@ -466,6 +555,7 @@ def run_game(screen):
                 pygame.font.SysFont("comicsansms", 12),
                 "#3a220c",
                 affordable=can_afford,
+                icon_image=icon_image,
             )
 
         draw_button(canvas, pygame.Rect(150, 420 + base_y, 100, 32), (220, 220, 220), "Prev", button_font, "#3a220c")
@@ -491,7 +581,7 @@ def run_game(screen):
 
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((640, 480))
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
     show_start_screen(screen)
     run_game(screen)
 
