@@ -94,10 +94,10 @@ def build_upgrade_state():
         "Mega Oven",
     ]
     upgrade_button_positions = [
-        pygame.Rect(35, 125, 260, 80),
-        pygame.Rect(345, 125, 260, 80),
-        pygame.Rect(35, 215, 260, 80),
-        pygame.Rect(345, 215, 260, 80),
+        pygame.Rect(35, 125, 320, 110),
+        pygame.Rect(375, 125, 320, 110),
+        pygame.Rect(35, 255, 320, 110),
+        pygame.Rect(375, 255, 320, 110),
     ]
     upgrade_colors = [
         (255, 214, 102),
@@ -339,20 +339,6 @@ def run_game(screen):
 
     character = my_character.Character(screen, 220, 140)
 
-    # JJ bonus event
-    jj_image = None
-    if os.path.exists("/mnt/data/jj.png"):
-        try:
-            jj_image = pygame.transform.smoothscale(pygame.image.load("/mnt/data/jj.png").convert_alpha(), (90, 90))
-        except Exception:
-            jj_image = None
-    jj_active = False
-    jj_rect = pygame.Rect(0, 0, 90, 90)
-    jj_pos = [0.0, 0.0]
-    jj_vel = [4.0, 3.0]
-    auto_click_multiplier = 1
-    auto_click_multiplier_end = 0
-
     # Load brownie click sound (if available)
     brownie_sound = None
     sound_path = os.path.join(os.path.dirname(__file__), "brownie.mp3")
@@ -363,6 +349,18 @@ def run_game(screen):
             brownie_sound = pygame.mixer.Sound(sound_path)
         except Exception:
             brownie_sound = None
+
+    jj_path = os.path.join(os.path.dirname(__file__), "jj.png")
+    jj_image = None
+    if os.path.exists(jj_path):
+        jj_image = pygame.image.load(jj_path).convert_alpha()
+        jj_image = pygame.transform.smoothscale(jj_image, (80, 80))
+    jj_active = False
+    jj_rect = pygame.Rect(0, 0, 80, 80)
+    jj_dx = 4
+    jj_dy = 3
+    auto_boost_active = False
+    auto_boost_end_time = 0
 
     manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages = build_upgrade_state()
     current_page = 0
@@ -445,20 +443,23 @@ def run_game(screen):
 
                     if character_rect.collidepoint(world_pos):
                         click_bonus = 1 + get_click_bonus(manager)
+                        if auto_boost_active:
+                            click_bonus *= 2
                         score += click_bonus
-                        if random.random() < 0.05 and jj_image is not None and not jj_active:
+                        if random.random() < 0.01 and not jj_active and jj_image is not None:
                             jj_active = True
-                            jj_pos = [random.randint(0, max(0, screen.get_width()-90)), random.randint(80, max(80, screen.get_height()-90))]
-                            jj_vel = [random.choice([-5,5]), random.choice([-4,4])]
-                    if jj_active and jj_rect.collidepoint(world_pos):
-                        jj_active = False
-                        auto_click_multiplier = 2
-                        auto_click_multiplier_end = pygame.time.get_ticks() + 10000
+                            jj_rect.x = random.randint(0, max(0, screen.get_width()-80))
+                            jj_rect.y = random.randint(80, max(80, screen.get_height()-80))
                         if brownie_sound and not mute_sound:
                             try:
                                 brownie_sound.play()
                             except Exception:
                                 pass
+
+                    if jj_active and jj_rect.collidepoint(world_pos):
+                        jj_active = False
+                        auto_boost_active = True
+                        auto_boost_end_time = pygame.time.get_ticks() + 10000
 
                     mute_button_rect = pygame.Rect(650, 20, 100, 38)
                     if mute_button_rect.collidepoint(world_pos):
@@ -531,14 +532,16 @@ def run_game(screen):
 
         if screen_mode == "play" and frame_count % 60 == 0:
             auto_bonus = get_auto_bonus(manager)
-            score += auto_bonus * auto_click_multiplier
-
-        if auto_click_multiplier == 2 and pygame.time.get_ticks() > auto_click_multiplier_end:
-            auto_click_multiplier = 1
+            if auto_boost_active:
+                auto_bonus *= 2
+            score += auto_bonus
 
         if screen_mode == "play" and should_trigger_end_screen(score):
             game_end_time = pygame.time.get_ticks() / 1000 - game_start_time
             screen_mode = "end"
+
+        if auto_boost_active and pygame.time.get_ticks() > auto_boost_end_time:
+            auto_boost_active = False
 
         # Draw everything to a taller canvas, then blit the visible portion
         canvas = pygame.Surface((screen.get_width(), total_height))
@@ -589,16 +592,13 @@ def run_game(screen):
                 canvas.blit(icon_img, pos)
 
         if jj_active and jj_image is not None:
-            jj_pos[0] += jj_vel[0]
-            jj_pos[1] += jj_vel[1]
-            if jj_pos[0] <= 0 or jj_pos[0] >= canvas.get_width()-90:
-                jj_vel[0] *= -1
-            if jj_pos[1] <= 80 or jj_pos[1] >= screen.get_height()-90:
-                jj_vel[1] *= -1
-            jj_rect.topleft = (int(jj_pos[0]), int(jj_pos[1]))
+            jj_rect.x += jj_dx
+            jj_rect.y += jj_dy
+            if jj_rect.left <= 0 or jj_rect.right >= screen.get_width():
+                jj_dx *= -1
+            if jj_rect.top <= 0 or jj_rect.bottom >= screen.get_height():
+                jj_dy *= -1
             canvas.blit(jj_image, jj_rect)
-            bonus_font = pygame.font.SysFont("comicsansms", 18)
-            canvas.blit(bonus_font.render("Click JJ for 10s 2x Auto!", True, (255,255,255)), (jj_rect.x-20, jj_rect.y-20))
 
         # Upgrades area (below play area)
         base_y = upgrades_offset
