@@ -241,6 +241,17 @@ def run_game(screen):
 
     character = my_character.Character(screen, 220, 140)
 
+    # Load brownie click sound (if available)
+    brownie_sound = None
+    sound_path = os.path.join(os.path.dirname(__file__), "brownie.mp3")
+    if os.path.exists(sound_path):
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            brownie_sound = pygame.mixer.Sound(sound_path)
+        except Exception:
+            brownie_sound = None
+
     manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages = build_upgrade_state()
     current_page = 0
     purchase_message = ""
@@ -251,6 +262,11 @@ def run_game(screen):
     button_font = pygame.font.SysFont("comicsansms", 24)
     clock = pygame.time.Clock()
     screen_mode = "play"
+    # Scrolling setup: upgrades live below the main play area
+    upgrades_offset = screen.get_height()
+    total_height = screen.get_height() + screen.get_height()
+    max_scroll = max(0, total_height - screen.get_height())
+    scroll_y = 0
 
     while True:
         clock.tick(60)
@@ -261,48 +277,42 @@ def run_game(screen):
                 pygame.quit()
                 sys.exit()
 
+            # Mouse wheel support (pygame.MOUSEWHEEL)
+            if event.type == pygame.MOUSEWHEEL:
+                scroll_y = min(max(scroll_y - event.y * 40, 0), max_scroll)
+
+            # Older mouse wheel via button 4/5
             if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 4:
+                    scroll_y = min(max(scroll_y - 40, 0), max_scroll)
+                    continue
+                if event.button == 5:
+                    scroll_y = min(max(scroll_y + 40, 0), max_scroll)
+                    continue
+
                 mouse_pos = pygame.mouse.get_pos()
+                # translate to canvas/world coordinates
+                world_pos = (mouse_pos[0], mouse_pos[1] + scroll_y)
 
                 if screen_mode == "play":
                     character_rect = character.get_rect()
                     upgrades_button = pygame.Rect(470, 20, 140, 40)
 
-                    if character_rect.collidepoint(mouse_pos):
+                    if character_rect.collidepoint(world_pos):
                         click_bonus = 1 + get_click_bonus(manager)
                         score += click_bonus
+                        if brownie_sound:
+                            try:
+                                brownie_sound.play()
+                            except Exception:
+                                pass
 
-                    if upgrades_button.collidepoint(mouse_pos):
-                        screen_mode = "upgrades"
-
-                elif screen_mode == "upgrades":
-                    back_button = pygame.Rect(20, 16, 110, 38)
-                    prev_page_button = pygame.Rect(150, 420, 100, 34)
-                    next_page_button = pygame.Rect(390, 420, 100, 34)
-
-                    if back_button.collidepoint(mouse_pos):
-                        screen_mode = "play"
-                        purchase_message = ""
-
-                    if prev_page_button.collidepoint(mouse_pos) and current_page > 0:
-                        current_page -= 1
-                        purchase_message = ""
-
-                    if next_page_button.collidepoint(mouse_pos) and current_page < len(upgrade_pages) - 1:
-                        current_page += 1
-                        purchase_message = ""
-
-                    for index, upgrade in enumerate(upgrade_pages[current_page]):
-                        if index >= len(upgrade_button_positions):
-                            continue
-
-                        if upgrade_button_positions[index].collidepoint(mouse_pos):
-                            bought, cost, _, status = manager.buy(upgrade.name, score)
-                            if bought:
-                                score -= cost
-                                purchase_message = f"Bought {status['name']}!"
-                            else:
-                                purchase_message = f"Need {cost} points for {status['name']}"
+                    if upgrades_button.collidepoint(world_pos):
+                        # toggle scroll to upgrades section
+                        if scroll_y < upgrades_offset // 2:
+                            scroll_y = upgrades_offset
+                        else:
+                            scroll_y = 0
 
                 elif screen_mode == "end":
                     manager, upgrade_names, upgrade_button_positions, upgrade_colors, upgrade_pages = build_upgrade_state()
@@ -311,6 +321,43 @@ def run_game(screen):
                     frame_count = 0
                     screen_mode = "play"
 
+                # Handle clicks in the upgrades area (below the play area)
+                # world_pos is defined above when processing MOUSEBUTTONDOWN
+                try:
+                    if world_pos[1] >= upgrades_offset:
+                        # Back button scrolls to top
+                        back_button = pygame.Rect(20, 16 + upgrades_offset, 110, 40)
+                        prev_page_button = pygame.Rect(150, 420 + upgrades_offset, 100, 34)
+                        next_page_button = pygame.Rect(390, 420 + upgrades_offset, 100, 34)
+
+                        if back_button.collidepoint(world_pos):
+                            scroll_y = 0
+                            purchase_message = ""
+
+                        if prev_page_button.collidepoint(world_pos) and current_page > 0:
+                            current_page -= 1
+                            purchase_message = ""
+
+                        if next_page_button.collidepoint(world_pos) and current_page < len(upgrade_pages) - 1:
+                            current_page += 1
+                            purchase_message = ""
+
+                        for index, upgrade in enumerate(upgrade_pages[current_page]):
+                            if index >= len(upgrade_button_positions):
+                                continue
+
+                            rect = upgrade_button_positions[index].move(0, upgrades_offset)
+                            if rect.collidepoint(world_pos):
+                                bought, cost, _, status = manager.buy(upgrade.name, score)
+                                if bought:
+                                    score -= cost
+                                    purchase_message = f"Bought {status['name']}!"
+                                else:
+                                    purchase_message = f"Need {cost} points for {status['name']}"
+                except NameError:
+                    # world_pos may not be defined for non-MOUSEBUTTONDOWN events
+                    pass
+
         if screen_mode == "play" and frame_count % 60 == 0:
             auto_bonus = get_auto_bonus(manager)
             score += auto_bonus
@@ -318,115 +365,125 @@ def run_game(screen):
         if screen_mode == "play" and should_trigger_end_screen(score):
             screen_mode = "end"
 
+        # Draw everything to a taller canvas, then blit the visible portion
+        canvas = pygame.Surface((screen.get_width(), total_height))
+
         if background is not None:
-            bg_scaled = pygame.transform.smoothscale(background, screen.get_size())
-            screen.blit(bg_scaled, (0, 0))
+            bg_scaled = pygame.transform.smoothscale(background, (canvas.get_width(), canvas.get_height()))
+            canvas.blit(bg_scaled, (0, 0))
         else:
-            screen.fill((255, 255, 255))
+            canvas.fill((255, 255, 255))
 
-        if screen_mode == "play":
-            character.draw()
+        # Play area (top of canvas)
+        # ensure character draws onto the canvas surface
+        character.screen = canvas
+        character.draw()
 
-            score_text = font.render(f"Score: {score}", True, "#fff8e1")
-            score_panel = pygame.Surface((score_text.get_width() + 24, score_text.get_height() + 12), pygame.SRCALPHA)
-            score_panel.fill((40, 40, 40, 160))
-            score_x = 20
-            score_y = 16
-            screen.blit(score_panel, (score_x, score_y))
-            draw_text_with_shadow(screen, font, f"Score: {score}", (score_x + 12, score_y + 6), "#fff8e1")
-            draw_goal_banner(screen, button_font)
+        score_text = font.render(f"Score: {score}", True, "#fff8e1")
+        score_panel = pygame.Surface((score_text.get_width() + 24, score_text.get_height() + 12), pygame.SRCALPHA)
+        score_panel.fill((40, 40, 40, 160))
+        score_x = 20
+        score_y = 16
+        canvas.blit(score_panel, (score_x, score_y))
+        draw_text_with_shadow(canvas, font, f"Score: {score}", (score_x + 12, score_y + 6), "#fff8e1")
+        draw_goal_banner(canvas, button_font)
 
-            upgrades_button = pygame.Rect(450, 16, 170, 46)
-            draw_button(screen, upgrades_button, (92, 184, 92), "Upgrades", button_font, "white")
+        upgrades_button = pygame.Rect(450, 16, 170, 46)
+        draw_button(canvas, upgrades_button, (92, 184, 92), "Upgrades", button_font, "white")
 
-        elif screen_mode == "upgrades":
-            header_text = font.render("Upgrades", True, "#3a220c")
-            header_width = header_text.get_width() + 32
-            header_height = header_text.get_height() + 14
-            header_panel = pygame.Surface((header_width, header_height), pygame.SRCALPHA)
-            header_panel.fill((255, 247, 224, 170))
-            header_x = (screen.get_width() - header_width) // 2
-            header_y = 2
-            screen.blit(header_panel, (header_x, header_y))
-            draw_text_with_shadow(
-                screen,
-                font,
-                "Upgrades",
-                (header_x + 16, header_y + 4),
+        # Upgrades area (below play area)
+        base_y = upgrades_offset
+
+        header_text = font.render("Upgrades", True, "#3a220c")
+        header_width = header_text.get_width() + 32
+        header_height = header_text.get_height() + 14
+        header_panel = pygame.Surface((header_width, header_height), pygame.SRCALPHA)
+        header_panel.fill((255, 247, 224, 170))
+        header_x = (canvas.get_width() - header_width) // 2
+        header_y = base_y + 2
+        canvas.blit(header_panel, (header_x, header_y))
+        draw_text_with_shadow(
+            canvas,
+            font,
+            "Upgrades",
+            (header_x + 16, header_y + 4),
+            "#3a220c",
+        )
+
+        back_button = pygame.Rect(20, 16 + base_y, 110, 40)
+        draw_button(canvas, back_button, (225, 225, 225), "Back", button_font, "#3a220c")
+
+        click_income = 1 + get_click_bonus(manager)
+        auto_income = get_auto_bonus(manager)
+
+        image_x = canvas.get_width() - 128
+        image_y = base_y + canvas.get_height() - 130
+
+        if current_page == 0 and "chef" in environment_images:
+            chef_image = pygame.transform.smoothscale(environment_images["chef"], (92, 92))
+            canvas.blit(chef_image, (image_x, image_y))
+        elif current_page == 1 and "factory" in environment_images:
+            factory_image = pygame.transform.smoothscale(environment_images["factory"], (124, 100))
+            canvas.blit(factory_image, (image_x, image_y))
+        elif current_page == 2 and "city" in environment_images:
+            city_image = pygame.transform.smoothscale(environment_images["city"], (120, 92))
+            canvas.blit(city_image, (image_x, image_y))
+
+        # level panel
+        level_text = button_font.render(
+            f"Click Income: {click_income}   Auto Income: {auto_income}",
+            True,
+            "#3a220c",
+        )
+        level_width = level_text.get_width() + 28
+        level_height = level_text.get_height() + 12
+        level_panel = pygame.Surface((level_width, level_height), pygame.SRCALPHA)
+        level_panel.fill((255, 247, 224, 170))
+        level_x = (canvas.get_width() - level_width) // 2
+        level_y = base_y + 56
+        canvas.blit(level_panel, (level_x, level_y))
+        draw_text_with_shadow(
+            canvas,
+            button_font,
+            f"Click Income: {click_income}   Auto Income: {auto_income}",
+            (level_x + 14, level_y + 4),
+            "#3a220c",
+        )
+
+        for index, upgrade in enumerate(upgrade_pages[current_page]):
+            status = manager.get_status(upgrade.name)
+            rect = upgrade_button_positions[index].move(0, base_y)
+            button_color = upgrade_colors[index] if index < len(upgrade_colors) else (200, 200, 200)
+            can_afford = score >= status['cost']
+            draw_upgrade_button(
+                canvas,
+                rect,
+                button_color,
+                status['name'],
+                status['cost'],
+                status['description'],
+                pygame.font.SysFont("comicsansms", 16),
+                pygame.font.SysFont("comicsansms", 12),
                 "#3a220c",
+                affordable=can_afford,
             )
 
-            back_button = pygame.Rect(20, 16, 110, 40)
-            draw_button(screen, back_button, (225, 225, 225), "Back", button_font, "#3a220c")
+        draw_button(canvas, pygame.Rect(150, 420 + base_y, 100, 32), (220, 220, 220), "Prev", button_font, "#3a220c")
+        draw_button(canvas, pygame.Rect(390, 420 + base_y, 100, 32), (220, 220, 220), "Next", button_font, "#3a220c")
 
-            click_income = 1 + get_click_bonus(manager)
-            auto_income = get_auto_bonus(manager)
+        page_text = button_font.render(f"Page {current_page + 1}/{len(upgrade_pages)}", True, "#3a220c")
+        canvas.blit(page_text, (270, 426 + base_y))
 
-            image_x = screen.get_width() - 128
-            image_y = screen.get_height() - 130
+        if purchase_message:
+            draw_text_with_shadow(canvas, button_font, purchase_message, (20, 370 + base_y), "#3a220c")
 
-            if current_page == 0 and "chef" in environment_images:
-                chef_image = pygame.transform.smoothscale(environment_images["chef"], (92, 92))
-                screen.blit(chef_image, (image_x, image_y))
-            elif current_page == 1 and "factory" in environment_images:
-                factory_image = pygame.transform.smoothscale(environment_images["factory"], (124, 100))
-                screen.blit(factory_image, (image_x, image_y))
-            elif current_page == 2 and "city" in environment_images:
-                city_image = pygame.transform.smoothscale(environment_images["city"], (120, 92))
-                screen.blit(city_image, (image_x, image_y))
-
-            # 升级页面不显示目标横幅
-
-            click_income = 1 + get_click_bonus(manager)
-            auto_income = get_auto_bonus(manager)
-            level_text = button_font.render(
-                f"Click Income: {click_income}   Auto Income: {auto_income}",
-                True,
-                "#3a220c",
-            )
-            level_width = level_text.get_width() + 28
-            level_height = level_text.get_height() + 12
-            level_panel = pygame.Surface((level_width, level_height), pygame.SRCALPHA)
-            level_panel.fill((255, 247, 224, 170))
-            level_x = (screen.get_width() - level_width) // 2
-            level_y = 56
-            screen.blit(level_panel, (level_x, level_y))
-            draw_text_with_shadow(
-                screen,
-                button_font,
-                f"Click Income: {click_income}   Auto Income: {auto_income}",
-                (level_x + 14, level_y + 4),
-                "#3a220c",
-            )
-
-            for index, upgrade in enumerate(upgrade_pages[current_page]):
-                status = manager.get_status(upgrade.name)
-                rect = upgrade_button_positions[index]
-                button_color = upgrade_colors[index] if index < len(upgrade_colors) else (200, 200, 200)
-                can_afford = score >= status['cost']
-                draw_upgrade_button(
-                    screen,
-                    rect,
-                    button_color,
-                    status['name'],
-                    status['cost'],
-                    status['description'],
-                    pygame.font.SysFont("comicsansms", 16),
-                    pygame.font.SysFont("comicsansms", 12),
-                    "#3a220c",
-                    affordable=can_afford,
-                )
-
-            draw_button(screen, pygame.Rect(150, 420, 100, 32), (220, 220, 220), "Prev", button_font, "#3a220c")
-            draw_button(screen, pygame.Rect(390, 420, 100, 32), (220, 220, 220), "Next", button_font, "#3a220c")
-
-            page_text = button_font.render(f"Page {current_page + 1}/{len(upgrade_pages)}", True, "#3a220c")
-            screen.blit(page_text, (270, 426))
-
-            if purchase_message:
-                draw_text_with_shadow(screen, button_font, purchase_message, (20, 370), "#3a220c")
-
+        # End screen overlay if triggered
+        if screen_mode != "end":
+            # blit visible portion of canvas
+            screen.blit(canvas, (0, -scroll_y))
         else:
+            # show end overlay on top of visible canvas
+            screen.blit(canvas, (0, -scroll_y))
             draw_end_screen(screen, end_title)
 
         pygame.display.update()
